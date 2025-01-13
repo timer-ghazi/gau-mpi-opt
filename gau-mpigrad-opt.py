@@ -262,7 +262,8 @@ while True:
         print " > Rank %02i running %s for %s host: %s" % ( rank, codeName, file2Run, name )
         errcode = estcode.executeCode(file2Run,Verbose=False)
         if errcode != 0:
-            print " !!!\n !!! ERROR: Rank %02i %s run for %s failed; host: %s, status: %i\n !!!" % ( rank, codeName, file2Run, name, errcode )    
+            #print " !!!\n !!! ERROR: Rank %02i  %s run for %s failed; host: %s\n !!!" % ( rank, codeName, file2Run, name )    
+            # print " !!!\n !!! ERROR: Rank %02i %s run for %s failed; host: %s, status: %i\n !!!" % ( rank, codeName, file2Run, name, errcode )    
             error_info.append((rank, file2Run, name, errcode))
         else:
             print " > Rank %02i %s run for %s complete; host: %s, status: %i" % ( rank, codeName, file2Run, name, errcode )
@@ -282,7 +283,8 @@ while True:
                 has_errors = True
                 for error_data in proc_error_info:
                     rank_num, file_name, host_name, error_code = error_data
-                    print " !!! Error on rank %02i: file: %s, host: %s, status: %i" % (rank_num, file_name, host_name, error_code)
+                    # print " !!! Error on rank %02i: file: %s, host: %s, status: %i" % (rank_num, file_name, host_name, error_code)
+                    print " !!! Error on rank %02i: file: %s, host: %s" % (rank_num, file_name, host_name)
 
     
     comm.barrier()

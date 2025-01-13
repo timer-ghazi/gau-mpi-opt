@@ -648,7 +648,6 @@ else
   echo "\$BASEN \$(cat \$BASEN.time) Finished on: \$(date) Host: \$HST" >> \$WKDIR/\$BASEN.time 
 fi
 
-rm -rf \$TMPDIR
 cd \$WKDIR 
 rm -rf \$SCRDIR
 

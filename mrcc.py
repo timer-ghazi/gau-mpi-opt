@@ -31,9 +31,13 @@ def executeCode(flName,estCodeScript="./run-mrcc.sh",Verbose=True):
     "Executes Bash script" 
     if Verbose:
         print "Running MRCC script for ", flName
-    os.system(estCodeScript + " " + flName)
+    errcode = os.system(estCodeScript + " " + flName)
     if Verbose:
-        print "Done running MRCC script for ", flName
+        if errcode != 0:
+            print "Error running MRCC", flName, " ", errcode
+        else:
+            print "Done running MRCC script for ", flName, " ", errcode
+    return errcode
     #return estCodeParseOutputEnergy(outFlName=baseFlName+".out")
 
 
