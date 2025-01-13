@@ -611,19 +611,19 @@ cd \$SCRDIR
 export OMP_NUM_THREADS=$MRCCCORES
 export MKL_NUM_THREADS=$MRCCCORES
 
-CPUVENDOR=\$(lscpu | grep "Vendor ID" | awk '{print \$3}')
-
-if [ "\$CPUVENDOR" == "AuthenticAMD" ]; then
-    export KMP_AFFINITY=compact
-else 
-    export KMP_AFFINITY=scatter
-fi
-
-HST=\$(hostname)
-echo "\$(date) Running \$1 on \$HST Scratch: \$SCRDIR" > \$WKDIR/\$BASEN.messages
-echo "KMP_AFFINITY="\$KMP_AFFINITY                 >> \$WKDIR/\$BASEN.messages
-echo "OMP_NUM_THREADS="\$OMP_NUM_THREADS           >> \$WKDIR/\$BASEN.messages
-echo "MKL_NUM_THREADS="\$MKL_NUM_THREADS           >> \$WKDIR/\$BASEN.messages
+# CPUVENDOR=\$(lscpu | grep "Vendor ID" | awk '{print \$3}')
+# 
+# if [ "\$CPUVENDOR" == "AuthenticAMD" ]; then
+#     export KMP_AFFINITY=compact
+# else 
+#     export KMP_AFFINITY=scatter
+# fi
+# 
+# HST=\$(hostname)
+# echo "\$(date) Running \$1 on \$HST Scratch: \$SCRDIR" > \$WKDIR/\$BASEN.messages
+# echo "KMP_AFFINITY="\$KMP_AFFINITY                 >> \$WKDIR/\$BASEN.messages
+# echo "OMP_NUM_THREADS="\$OMP_NUM_THREADS           >> \$WKDIR/\$BASEN.messages
+# echo "MKL_NUM_THREADS="\$MKL_NUM_THREADS           >> \$WKDIR/\$BASEN.messages
 
 
 if [ -f \$WKDIR/GENBAS ]
