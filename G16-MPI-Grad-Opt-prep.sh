@@ -373,6 +373,7 @@ cat > $SSCR << EOF
 #SBATCH --ntasks=$NINSTANCES
 #SBATCH --cpus-per-task=$ESTCORES
 #SBATCH --mem=$ESTMEM
+#SBATCH --time=208:00:00
 # #SBATCH --ntasks-per-node=1
 # * Note: use --ntasks-per-node=1 if at all possible--MRCC runs seem to significantly interfere with each other 
 
