@@ -20,28 +20,91 @@ from mpi4py import MPI
 from gradienteval import GradientEvaluator
 
 def cleanup_and_exit(gaussian_process=None, error_status=0):
-    """Cleanup function to ensure proper termination"""
-    if gaussian_process is not None:
+    """Cleanup function to ensure proper termination. Limits most prints to Rank 0."""
+    global rank # Make sure we use the rank defined outside
+
+    # --- Conditional Gaussian Process Cleanup ---
+    # Only Rank 0 should attempt and report on Gaussian process cleanup.
+    if rank == 0 and gaussian_process is not None and error_status != 0:
+        print(" * Rank 0: Gaussian process exited abnormally (status: {}) or error occurred, attempting cleanup...".format(error_status))
         try:
-            # Get the process group id
             pgid = os.getpgid(gaussian_process.pid)
-            
-            # Force kill the entire process group immediately
             try:
+                print(" * Rank 0: Attempting to terminate Gaussian process group (PGID: {})...".format(pgid))
                 os.killpg(pgid, signal.SIGKILL)
+                print(" * Rank 0: Gaussian process group terminated.")
             except OSError as e:
-                print " * Error killing gaussian process group:", str(e)
-            
+                if e.errno == 3: # ESRCH
+                     print(" * Rank 0 Warning: Gaussian process group already gone when attempting termination during error cleanup.")
+                else:
+                     print(" * Rank 0 Error killing gaussian process group during error cleanup: {}".format(e))
         except OSError as e:
-            print " * Error getting gaussian process group:", str(e)
-    
+             if e.errno == 3: # ESRCH
+                 print(" * Rank 0 Warning: Could not get PGID during error cleanup, Gaussian process already gone.")
+             else:
+                 print(" * Rank 0 Error getting gaussian process group during error cleanup: {}".format(e))
+
+    # --- MPI Finalize/Abort logic ---
+    # Check if MPI is initialized and not already finalized before proceeding
     if MPI.Is_initialized() and not MPI.Is_finalized():
         try:
-            MPI.Finalize()
-        except:
-            MPI.COMM_WORLD.Abort(error_status)
-    
+            if error_status != 0:
+                # Only Rank 0 prints the detailed reason for aborting.
+                if rank == 0:
+                    print(" * Rank 0: Aborting MPI job due to error status: {}".format(error_status))
+                # ALL ranks MUST call Abort to terminate the job properly.
+                MPI.COMM_WORLD.Abort(error_status)
+            else:
+                # Normal finalization on success (error_status == 0).
+                if rank == 0:
+                    print(" * Rank 0: Finalizing MPI...")
+                # ALL ranks must call Finalize.
+                MPI.Finalize()
+                if rank == 0:
+                    print(" * Rank 0: MPI Finalized.")
+        except Exception as e:
+             # If any error occurs during Finalize/Abort itself.
+             if rank == 0:
+                print(" * Rank 0 Error during MPI Finalize/Abort: {}".format(e))
+             # Ensure abort still happens forcefully if finalize fails or another error occurred.
+             # Check Is_finalized again in case the exception occurred after finalize started.
+             if not MPI.Is_finalized():
+                 # Abort with 1 as a generic error if finalize failed during a supposed success run.
+                 MPI.COMM_WORLD.Abort(error_status if error_status != 0 else 1)
+
+    # Only Rank 0 prints the final script exit status message.
+    # Note: MPI_Abort might terminate processes before this line is reached.
+    if rank == 0:
+        print(" * Rank 0: Exiting script with status: {}".format(error_status))
+
+    # All ranks exit. MPI_Abort is the primary mechanism for termination in error cases.
     sys.exit(error_status)
+
+
+
+#-- def cleanup_and_exit(gaussian_process=None, error_status=0):
+#--     """Cleanup function to ensure proper termination"""
+#--     if gaussian_process is not None:
+#--         try:
+#--             # Get the process group id
+#--             pgid = os.getpgid(gaussian_process.pid)
+#--             
+#--             # Force kill the entire process group immediately
+#--             try:
+#--                 os.killpg(pgid, signal.SIGKILL)
+#--             except OSError as e:
+#--                 print " * Error killing gaussian process group:", str(e)
+#--             
+#--         except OSError as e:
+#--             print " * Error getting gaussian process group:", str(e)
+#--     
+#--     if MPI.Is_initialized() and not MPI.Is_finalized():
+#--         try:
+#--             MPI.Finalize()
+#--         except:
+#--             MPI.COMM_WORLD.Abort(error_status)
+#--     
+#--     sys.exit(error_status)
 
 comm = MPI.COMM_WORLD
 size = comm.Get_size()
