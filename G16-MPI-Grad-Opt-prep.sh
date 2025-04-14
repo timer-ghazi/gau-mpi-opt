@@ -561,14 +561,14 @@ mpirun -np \$INSTANCES -f \$MY_NODEFILE -launcher ssh  gau-mpigrad-opt.py \$JOBF
 
 
 
-cat \$JOBFILE-?0?-*.time >> \$JOBFILE.times
-tar czf \$JOBFILE.tgz \$JOBFILE-?0?-* \$JOBFILE-MOLECULE.*
+cat \$JOBFILE-?0?-*.time >> \$JOBFILE.times &> /dev/null 
+tar czf \$JOBFILE.tgz \$JOBFILE-?0?-* \$JOBFILE-MOLECULE.* &> /dev/null 
 
 mv \$JOBFILE-MOLECULE.out    \$JOBFILE.out  &> /dev/null
 mv \$JOBFILE-MOLECULE.MINP   \$JOBFILE.MINP &> /dev/null
 mv \$JOBFILE-MOLECULE.mpi   \$JOBFILE.mpi &> /dev/null
 mv \$JOBFILE-MOLECULE.inp   \$JOBFILE.inp &> /dev/null
-rm \$JOBFILE-?0?-* \$JOBFILE-MOLECULE.*
+rm \$JOBFILE-?0?-* \$JOBFILE-MOLECULE.* &> /dev/null 
 
 rm gau_EOut &> /dev/null  
 rm GAU_DONE &> /dev/null
@@ -685,29 +685,64 @@ HST=\$(hostname)
 echo "\$(date) Running \$1 on \$HST Scratch: \$TMPDIR" > \$WKDIR/\$BASEN.messages
 echo "Number of CPUs used "\$MLPCPUS >> \$WKDIR/\$BASEN.messages
 
-module unload slurm 
+module unload slurm
 
 hydra_exe=$MOLPRODIR/mpiexec.hydra
 molpro_exe=$MOLPRODIR/molpro.exe
 
-/usr/bin/time -f "%e %P" -o \$WKDIR/\$BASEN.time \$hydra_exe -launcher ssh -hosts \$HST -np \$MLPCPUS \$molpro_exe \$1 -t 1  &>> \$WKDIR/\$BASEN.messages
+# --- Retry Logic Start ---
+MAX_ATTEMPTS=3
+ATTEMPT=1
+EXSTATUS=-1 # Initialize with a non-zero status
+SLEEP_TIME=5 # Seconds to wait between retries
 
-EXSTATUS=\$?
+while [ \$ATTEMPT -le \$MAX_ATTEMPTS ]; do
+    echo "Attempt \$ATTEMPT of \$MAX_ATTEMPTS starting on \$(date)..." >> \$WKDIR/\$BASEN.messages
 
-# Check the exit status
+    # Execute the Molpro command
+    /usr/bin/time -f "%e %P" -o \$WKDIR/\$BASEN.time \$hydra_exe -launcher ssh -hosts \$HST -np \$MLPCPUS \$molpro_exe \$1 -t 1 &>> \$WKDIR/\$BASEN.messages
+    EXSTATUS=\$? # Capture the exit status
+
+    # Check if the command was successful
+    if [ \$EXSTATUS -eq 0 ]; then
+        echo "Attempt \$ATTEMPT succeeded." >> \$WKDIR/\$BASEN.messages
+        break # Exit the loop on success
+    fi
+
+    # If failed, print message and prepare for next attempt (if any)
+    echo "Attempt \$ATTEMPT failed with exit status \$EXSTATUS." >> \$WKDIR/\$BASEN.messages
+    ATTEMPT=\$((ATTEMPT + 1))
+
+    if [ \$ATTEMPT -le \$MAX_ATTEMPTS ]; then
+        echo "Waiting \$SLEEP_TIME seconds before next attempt..." >> \$WKDIR/\$BASEN.messages
+        sleep \$SLEEP_TIME
+    fi
+done
+# --- Retry Logic End ---
+
+# Check the final exit status after all attempts
 if [ \$EXSTATUS -ne 0 ]; then
-  echo "\$BASEN The executable terminated with an error \$EXSTATUS" >> \$WKDIR/\$BASEN.messages
-  mkdir -p \$WKDIR/ERRORS && cp \$WKDIR/\$BASEN.* \$WKDIR/ERRORS/
+  echo "\$BASEN The executable terminated with an error \$EXSTATUS after \$MAX_ATTEMPTS attempts." >> \$WKDIR/\$BASEN.messages
+  # Create ERRORS directory and copy relevant files only on final failure
+  mkdir -p \$WKDIR/ERRORS && cp \$WKDIR/\$BASEN.* \$WKDIR/ERRORS/ &> /dev/null
 fi
 
-echo "\$BASEN \$(cat \$BASEN.time) Finished on: \$(date) Host: \$HST" >> \$WKDIR/\$BASEN.time 
+# Record final timing and completion message only if successful eventually
+if [ \$EXSTATUS -eq 0 ]; then
+    echo "\$BASEN \$(cat \$WKDIR/\$BASEN.time) Finished successfully on: \$(date) Host: \$HST" >> \$WKDIR/\$BASEN.time
+else
+    # Add a failure marker to the time file if it exists
+    echo "FAILED_AFTER_RETRIES" >> \$WKDIR/\$BASEN.time
+fi
 
+# Clean up scratch directory regardless of success or failure
 rm -rf \$TMPDIR
 
-# Exit the script with the same status as the executable
+# Exit the script with the *final* exit status after all attempts
 exit \$EXSTATUS
 
 EOF
+
 chmod +x run-molpro.sh
 echo -e $DIM "*" $UND"run-molpro.sh$DEF$DIM: Molpro execution script$DEF"
 
